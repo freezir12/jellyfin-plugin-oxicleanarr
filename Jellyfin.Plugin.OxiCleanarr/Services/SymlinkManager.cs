@@ -61,9 +61,24 @@ public class SymlinkManager
     {
         _ = cancellationToken; // Reserved for future use
         bool sourceIsDirectory = Directory.Exists(sourcePath);
-        if (!sourceIsDirectory && !File.Exists(sourcePath))
+        bool sourceIsFile = !sourceIsDirectory && File.Exists(sourcePath);
+
+        if (!sourceIsDirectory && !sourceIsFile)
         {
-            throw new FileNotFoundException($"Source file not found: {sourcePath}");
+            // If the path has no file extension, assume it is a directory (e.g. a TV show folder).
+            // Directory.Exists can return false even for existing directories when the Jellyfin
+            // service account lacks read-permission on the parent mount — still attempt symlink creation.
+            if (string.IsNullOrEmpty(Path.GetExtension(sourcePath)))
+            {
+                sourceIsDirectory = true;
+                _logger.LogWarning(
+                    "Source path not found via Directory.Exists, but path has no extension — treating as directory: {SourcePath}",
+                    sourcePath);
+            }
+            else
+            {
+                throw new FileNotFoundException($"Source file not found: {sourcePath}");
+            }
         }
 
         // Ensure target directory exists (fallback behavior)
