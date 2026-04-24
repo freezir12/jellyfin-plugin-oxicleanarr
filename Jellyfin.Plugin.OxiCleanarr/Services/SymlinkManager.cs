@@ -60,7 +60,8 @@ public class SymlinkManager
     public Task<string> CreateSymlinkAsync(string sourcePath, string targetDirectory, CancellationToken cancellationToken = default)
     {
         _ = cancellationToken; // Reserved for future use
-        if (!File.Exists(sourcePath))
+        bool sourceIsDirectory = Directory.Exists(sourcePath);
+        if (!sourceIsDirectory && !File.Exists(sourcePath))
         {
             throw new FileNotFoundException($"Source file not found: {sourcePath}");
         }
@@ -77,13 +78,25 @@ public class SymlinkManager
             _logger.LogInformation("Removing existing symlink: {Path}", symlinkPath);
             File.Delete(symlinkPath);
         }
+        else if (Directory.Exists(symlinkPath))
+        {
+            _logger.LogInformation("Removing existing directory symlink: {Path}", symlinkPath);
+            Directory.Delete(symlinkPath);
+        }
 
         _logger.LogInformation("Creating symlink: {Source} -> {Target}", sourcePath, symlinkPath);
 
-        // Create symlink (Unix-specific, Windows requires different approach)
         try
         {
-            File.CreateSymbolicLink(symlinkPath, sourcePath);
+            if (sourceIsDirectory)
+            {
+                Directory.CreateSymbolicLink(symlinkPath, sourcePath);
+            }
+            else
+            {
+                File.CreateSymbolicLink(symlinkPath, sourcePath);
+            }
+
             _logger.LogInformation("Successfully created symlink: {SymlinkPath} pointing to {SourcePath}", symlinkPath, sourcePath);
         }
         catch (Exception ex)
